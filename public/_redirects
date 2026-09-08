@@ -7,6 +7,7 @@
   /install/index.html
   200
 
+# /privacy-policy is handled by the SPA (main.tsx path switch).
 /*
   /index.html
   200

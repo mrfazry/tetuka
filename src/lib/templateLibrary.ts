@@ -214,7 +214,7 @@ export async function saveUploadedTemplate(file: File): Promise<SavedTemplate> {
   const ext = extFromName(file.name);
   const entry: SavedTemplate = {
     id,
-    name: `Unggah ${todayLabel()}`,
+    name: `Tambah ${todayLabel()}`,
     kind: "upload",
     createdAt: new Date().toISOString(),
   };

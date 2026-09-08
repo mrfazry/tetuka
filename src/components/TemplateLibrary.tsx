@@ -81,7 +81,7 @@ export function TemplateLibrary({
   if (templates.length === 0) {
     return (
       <div className="lib-empty">
-        Belum ada template. Unggah gambar atau buat yang baru.
+        Belum ada template. Tambah gambar atau buat yang baru.
       </div>
     );
   }

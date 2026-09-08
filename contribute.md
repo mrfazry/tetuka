@@ -3,7 +3,7 @@
 Developer notes for **tetuka** — a personal desktop (and browser) app that turns pasted text into Instagram-ready carousel PNGs.
 
 - Upload a background **or** generate a constrained procedural one
-- Split text on blank lines or a `---` line
+- Split text on two blank lines
 - Preview slides with pagination (`1 / N` when multi-slide)
 - Save templates locally; select or delete anytime
 - Export `slide-01.png`, `slide-02.png`, …
@@ -12,7 +12,7 @@ No auth. No cloud. No AI image generation.
 
 **License:** [MIT](./LICENSE)
 
-**End users:** open **`/install`** on the deployed site (or see **[Download & install](./README.md)**) for Windows (NSIS), macOS (DMG), and Linux (AppImage). The install page defaults to the latest stable GitHub Release and lets you pick older tags.
+**End users:** open **`/install`** on the deployed site (or see **[Download & install](./install.en.md)**) for Windows (NSIS), macOS (DMG), and Linux (AppImage). The install page defaults to the latest stable GitHub Release and lets you pick older tags.
 
 ## Stack
 
@@ -79,7 +79,7 @@ Set `GITHUB_REPOSITORY=owner/repo` when building so install-page links and the v
 ## Usage
 
 1. **Upload** an image template, or **Generate** / **Regenerate** a procedural background (saved to the library).
-2. Paste text. Separate slides with a blank line or a line containing only `---`.
+2. Paste text. Separate slides with two blank lines.
 3. Choose **1080×1350** or **1080×1080**.
 4. Preview with Prev/Next; export PNGs to a folder (desktop) or downloads (browser).
 

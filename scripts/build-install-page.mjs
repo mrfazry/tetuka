@@ -12,13 +12,9 @@ const repo =
 const githubBlobBase = `https://github.com/${repo}/blob/main`;
 const githubReleasesBase = `https://github.com/${repo}/releases`;
 
-/** Bilingual install guide in README.md: Indonesian first, English after `# Download & install`. */
-const README_SOURCE = "README.md";
-const EN_HEADING = "# Download & install";
-
 const pages = [
   {
-    langSection: "en",
+    source: "install.en.md",
     out: join("public", "install", "index.html"),
     lang: "en",
     title: "Download & install — tetuka",
@@ -43,7 +39,7 @@ const pages = [
     },
   },
   {
-    langSection: "id",
+    source: "install.id.md",
     out: join("public", "install", "id", "index.html"),
     lang: "id",
     title: "Unduh & instal — tetuka",
@@ -68,20 +64,6 @@ const pages = [
     },
   },
 ];
-
-function splitReadmeSections(markdown) {
-  const enIndex = markdown.indexOf(`\n${EN_HEADING}\n`);
-  if (enIndex < 0) {
-    throw new Error(
-      `${README_SOURCE} must contain Indonesian install docs followed by ${EN_HEADING}`,
-    );
-  }
-  let id = markdown.slice(0, enIndex).trimEnd();
-  // Drop the horizontal rule that separates the two language blocks.
-  id = id.replace(/\n---\s*$/, "").trimEnd();
-  const en = markdown.slice(enIndex + 1).trimStart();
-  return { id, en };
-}
 
 function rewriteDocLinks(html) {
   let out = html.replace(
@@ -434,17 +416,11 @@ ${htmlBody}
 
 marked.setOptions({ gfm: true });
 
-const readmeMarkdown = readFileSync(join(root, README_SOURCE), "utf8");
-const sections = splitReadmeSections(readmeMarkdown);
-
 for (const page of pages) {
-  const markdown = sections[page.langSection];
-  if (!markdown) {
-    throw new Error(`Missing ${page.langSection} section in ${README_SOURCE}`);
-  }
+  const markdown = readFileSync(join(root, page.source), "utf8");
   const htmlBody = rewriteDocLinks(marked.parse(markdown).trim());
   const outPath = join(root, page.out);
   mkdirSync(dirname(outPath), { recursive: true });
   writeFileSync(outPath, renderPage({ htmlBody, meta: page }), "utf8");
-  console.log(`Wrote ${page.out} (repo=${repo})`);
+  console.log(`Wrote ${page.out} from ${page.source} (repo=${repo})`);
 }

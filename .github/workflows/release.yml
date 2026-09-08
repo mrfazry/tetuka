@@ -144,7 +144,7 @@ jobs:
             - Local-only app — no account required
             - Desktop builds can auto-update from GitHub Releases
             - Verify downloads with `SHA256SUMS.txt` attached to this release
-            - See [README.md](../blob/main/README.md) for install steps per OS
+            - See [install.en.md](../blob/main/install.en.md) / [install.id.md](../blob/main/install.id.md) for install steps per OS
 
             ### Assets
 

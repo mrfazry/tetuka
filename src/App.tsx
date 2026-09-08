@@ -29,8 +29,7 @@ const SAMPLE = `Tulis slide pertama di sini.
 Paragraf kedua tetap di slide yang sama.
 
 
-Gunakan dua baris kosong antar slide
-— atau baris yang hanya berisi ---
+Gunakan dua baris kosong antar slide.
 
 
 Seperti slide ketiga ini.`;
@@ -52,6 +51,8 @@ export default function App() {
 
   const exportRefs = useRef<(HTMLDivElement | null)[]>([]);
   const autoUpdateChecked = useRef(false);
+  const previewFrameRef = useRef<HTMLDivElement | null>(null);
+  const [frameWidth, setFrameWidth] = useState(0);
 
   const size = canvasMode === "portrait" ? CANVAS_PORTRAIT : CANVAS_SQUARE;
   const slides = useMemo(() => splitText(text), [text]);
@@ -177,7 +178,7 @@ export default function App() {
       setStatus(`Disimpan “${entry.name}”`);
     } catch (err) {
       console.error(err);
-      setStatus("Tidak bisa mengunggah template");
+      setStatus("Tidak bisa menambah template");
     } finally {
       setBusy(false);
     }
@@ -226,18 +227,37 @@ export default function App() {
     }
   };
 
-  const previewScale = canvasMode === "portrait" ? 0.32 : 0.36;
+  const desktopCap = canvasMode === "portrait" ? 0.32 : 0.36;
+  const previewScale =
+    frameWidth > 0
+      ? Math.min(desktopCap, frameWidth / size.width)
+      : desktopCap;
+
+  useEffect(() => {
+    const el = previewFrameRef.current;
+    if (!el) return;
+
+    const update = () => setFrameWidth(el.clientWidth);
+    update();
+
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
 
   return (
     <div className="app">
       <header className="app-header">
         <div>
           <p className="brand">tetuka</p>
-          <p className="tagline">Pembuat post IG lokal — template, teks, ekspor.</p>
+          <p className="tagline">
+            Pembuat post IG lokal — proses di perangkat Anda. Teks &amp; template
+            tidak dikirim ke server.
+          </p>
         </div>
         <div className="header-actions">
           <button type="button" onClick={handleUpload} disabled={busy}>
-            Unggah
+            Tambah
           </button>
           <button type="button" onClick={handleGenerate} disabled={busy}>
             Generate template
@@ -316,7 +336,7 @@ export default function App() {
             <span>
               Teks{" "}
               <em>
-                (dua baris kosong atau <code>---</code> memisahkan slide)
+                (dua baris kosong memisahkan slide)
               </em>
             </span>
             <textarea
@@ -330,7 +350,7 @@ export default function App() {
         </aside>
 
         <main className="preview-pane">
-          <div className="preview-frame">
+          <div className="preview-frame" ref={previewFrameRef}>
             <Slide
               text={slides[slideIndex] ?? ""}
               template={active}
@@ -378,19 +398,41 @@ export default function App() {
         </main>
       </div>
 
-      {ready && !isDesktop && (
-        <p className="web-cta">
-          Butuh website atau web app? Konsultasi ke{" "}
+      <footer className="app-footer">
+        {ready && !isDesktop && (
+          <>
+            <p className="web-cta">
+              Mau install di komputer? Lihat caranya di{" "}
+              <a href="/install/id/">halaman unduh &amp; instal</a>.
+            </p>
+            <p className="web-cta">
+              Butuh website atau web app? Konsultasi ke{" "}
+              <a
+                href="https://b3-labs.id"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                B3 Labs
+              </a>
+              .
+            </p>
+          </>
+        )}
+        <p className="web-cta privacy-link">
           <a
-            href="https://b3-labs.id"
-            target="_blank"
-            rel="noopener noreferrer"
+            href="./privacy-policy"
+            onClick={(e) => {
+              e.preventDefault();
+              window.history.pushState({}, "", "/privacy-policy");
+              window.dispatchEvent(new PopStateEvent("popstate"));
+            }}
           >
-            B3 Labs
+            Kebijakan privasi
           </a>
-          .
+          {" — "}
+          semuanya di frontend; data Anda tidak dikirim ke server.
         </p>
-      )}
+      </footer>
 
       {/* Off-screen full-size slides for export */}
       <div className="export-stage" aria-hidden>
