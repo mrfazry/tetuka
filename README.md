@@ -1,86 +1,247 @@
-# tetuka
+# Unduh & instal
 
-Personal desktop (and browser) app that turns pasted text into Instagram-ready carousel PNGs.
+tetuka bersifat open source. Installer siap pakai dipublikasikan di **GitHub Releases** untuk Windows, macOS, dan Linux.
 
-- Upload a background **or** generate a constrained procedural one
-- Split text on blank lines or a `---` line
-- Preview slides with pagination (`1 / N` when multi-slide)
-- Save templates locally; select or delete anytime
-- Export `slide-01.png`, `slide-02.png`, …
+## Ambil rilis terbaru
 
-No auth. No cloud. No AI image generation.
+Gunakan tombol unduh di bagian atas halaman ini (rilis stabil terbaru secara default, atau pilih tag). Anda juga bisa membuka **GitHub Releases** repositori.
 
-**License:** [MIT](./LICENSE)
+Jika Anda mem-fork atau mengganti nama repo, gunakan halaman releases milik Anda sendiri.
 
-**End users:** open **`/install`** on the deployed site (or see **[Download & install](./INSTALL.md)**) for Windows (NSIS), macOS (DMG), and Linux (AppImage). The install page defaults to the latest stable GitHub Release and lets you pick older tags.
+---
 
-## Stack
+## Windows
 
-- Tauri 2 + React + TypeScript + Vite
-- `html-to-image` for PNG export
-- Works in the **browser** (`npm run dev`) with IndexedDB storage, or as a **desktop** app via Tauri
+**File yang dicari**
 
-## Prerequisites
+- `tetuka_<version>_x64-setup.exe` (installer NSIS)
 
-### All platforms
+**Instal**
 
-- [Node.js](https://nodejs.org/) 20+
-- [Rust](https://www.rust-lang.org/tools/install) stable (1.88+ recommended for latest Tauri deps; 1.87 works with the pinned lockfile)
+1. Unduh file `.exe`.
+2. Jalankan. Jika SmartScreen memperingatkan, pilih **More info** → **Run anyway** (build pribadi yang belum ditandatangani sering memicu ini).
+3. Selesaikan installer, lalu jalankan **tetuka** dari Start menu.
 
-### Linux (desktop build)
+**Uninstal**
+
+Gunakan **Settings → Apps** dan hapus **tetuka**.
+
+---
+
+## macOS
+
+**File yang dicari**
+
+- `tetuka_<version>_aarch64.dmg` — Apple Silicon (M1/M2/M3/…)  
+- `tetuka_<version>_x64.dmg` — Mac Intel  
+
+**Instal**
+
+1. Unduh file `.dmg` yang sesuai.
+2. Buka dan seret **tetuka** ke **Applications**.
+3. Peluncuran pertama: klik kanan aplikasi → **Open** → konfirmasi (Gatekeeper mungkin memblokir aplikasi yang belum ditandatangani).
+
+**Uninstal**
+
+Pindahkan aplikasi dari **Applications** ke Trash.
+
+---
+
+## Linux
+
+**File yang dicari**
+
+- `tetuka_<version>_amd64.AppImage` — berfungsi di sebagian besar distro (satu-satunya paket Linux yang kami sediakan)
+
+**Instal (AppImage)**
 
 ```bash
-sudo apt-get update
-sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+chmod +x "tetuka_"*_amd64.AppImage
+./tetuka_*_amd64.AppImage
 ```
 
-See [Tauri prerequisites](https://tauri.app/start/prerequisites/) for macOS/Windows details.
+Opsional: pindahkan ke `~/.local/bin/` dan buat desktop entry jika Anda ingin muncul di menu aplikasi.
 
-## Develop
+Pembaruan otomatis di dalam aplikasi bekerja dengan build AppImage. Pastikan file dapat ditulis (bukan di mount read-only) agar pembaruan bisa menggantinya.
+
+---
+
+## Setelah instal
+
+- Tidak perlu akun atau masuk.
+- Template disimpan **secara lokal** di komputer Anda.
+- Ekspor slide carousel sebagai file PNG ke folder yang Anda pilih.
+
+Lihat [contribute.md](./contribute.md) untuk cara penggunaan dan membangun dari sumber.
+
+## Verifikasi unduhan Anda (opsional)
+
+Utamakan aset dari halaman **Releases** resmi repositori ini. Setiap rilis menyertakan `SHA256SUMS.txt`.
 
 ```bash
+# Linux
+sha256sum -c SHA256SUMS.txt --ignore-missing
+
+# macOS
+shasum -a 256 -c SHA256SUMS.txt --ignore-missing
+```
+
+Di Windows, bandingkan SHA-256 file yang diunduh dengan baris yang cocok di `SHA256SUMS.txt` (mis. `CertUtil -hashfile <file> SHA256`).
+
+Build desktop juga menyertakan tanda tangan updater Tauri (`latest.json` + minisign). Penandatanganan installer OS (SmartScreen / Gatekeeper) belum diterapkan—harapkan peringatan di atas.
+
+## Belum ada rilis?
+
+Jika Releases masih kosong, bangun dari sumber (pengembang):
+
+```bash
+git clone https://github.com/<owner>/<repo>.git
+cd <repo>
 npm install
-npm run dev          # browser UI at http://localhost:1420
-npm run tauri:dev    # native desktop window (needs OS deps)
-```
-
-## Build installers
-
-```bash
 npm run tauri:build
 ```
 
-Artifacts land under `src-tauri/target/release/bundle/` (NSIS, AppImage, or DMG depending on OS).
-
-### Multi-OS releases
-
-Push a version tag or run the **release** GitHub Action:
+Installer muncul di `src-tauri/target/release/bundle/`. Maintainer dapat membuat rilis dengan memberi tag:
 
 ```bash
 git tag v0.1.0
 git push origin v0.1.0
 ```
 
-CI builds Windows, macOS, and Linux (AppImage) installers, publishes a GitHub Release for that tag (including `latest.json` and `SHA256SUMS.txt`), then deploys the site to Cloudflare Pages.
+Itu memicu GitHub Action yang melampirkan installer Windows / macOS / Linux (AppImage) ke rilis, termasuk `latest.json` dan `SHA256SUMS.txt`. Setelah rilis sukses, situs (termasuk `/install`) di-deploy ke Cloudflare Pages.
 
-Required repository secrets:
+Setel secret Actions:
 
-- `TAURI_SIGNING_PRIVATE_KEY` / `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` — updater artifact signing
-- `CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID` — Pages deploy after a successful release
+- `TAURI_SIGNING_PRIVATE_KEY` / `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` — tanda tangan artefak updater
+- `CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID` — deploy Pages setelah rilis
 
-Local site deploy (optional):
+---
+
+# Download & install
+
+tetuka is open source. Prebuilt installers are published on **GitHub Releases** for Windows, macOS, and Linux.
+
+## Get the latest release
+
+Use the download buttons at the top of this page (latest stable by default, or pick a tag). You can also open **GitHub Releases** for the repository.
+
+If you forked or renamed the repo, use your own releases page instead.
+
+---
+
+## Windows
+
+**Files to look for**
+
+- `tetuka_<version>_x64-setup.exe` (NSIS installer)
+
+**Install**
+
+1. Download the `.exe`.
+2. Run it. If SmartScreen warns, choose **More info** → **Run anyway** (unsigned personal builds often trigger this).
+3. Finish the installer, then launch **tetuka** from the Start menu.
+
+**Uninstall**
+
+Use **Settings → Apps** and remove **tetuka**.
+
+---
+
+## macOS
+
+**Files to look for**
+
+- `tetuka_<version>_aarch64.dmg` — Apple Silicon (M1/M2/M3/…)  
+- `tetuka_<version>_x64.dmg` — Intel Macs  
+
+**Install**
+
+1. Download the matching `.dmg`.
+2. Open it and drag **tetuka** into **Applications**.
+3. First launch: right-click the app → **Open** → confirm (Gatekeeper may block unsigned apps).
+
+**Uninstall**
+
+Move the app from **Applications** to Trash.
+
+---
+
+## Linux
+
+**Files to look for**
+
+- `tetuka_<version>_amd64.AppImage` — works on most distros (only Linux package we ship)
+
+**Install (AppImage)**
 
 ```bash
-npm run pages:deploy
+chmod +x "tetuka_"*_amd64.AppImage
+./tetuka_*_amd64.AppImage
 ```
 
-Set `GITHUB_REPOSITORY=owner/repo` when building so install-page links and the version picker target the correct Releases API.
+Optional: move it to `~/.local/bin/` and create a desktop entry if you want it in your app menu.
 
-## Usage
+In-app auto-update works with the AppImage build. Keep the file writable (not on a read-only mount) so updates can replace it.
 
-1. **Upload** an image template, or **Generate** / **Regenerate** a procedural background (saved to the library).
-2. Paste text. Separate slides with a blank line or a line containing only `---`.
-3. Choose **1080×1350** or **1080×1080**.
-4. Preview with Prev/Next; export PNGs to a folder (desktop) or downloads (browser).
+---
 
-Templates live in the app data directory on desktop, or IndexedDB in the browser.
+## After install
+
+- No account or sign-in.
+- Templates are stored **locally** on your machine.
+- Export carousel slides as PNG files to a folder you choose.
+
+See [contribute.md](./contribute.md) for usage and for building from source.
+
+## Verify what you downloaded (optional)
+
+Prefer assets from the official **Releases** page of this repository. Each release includes `SHA256SUMS.txt`.
+
+```bash
+# Linux
+sha256sum -c SHA256SUMS.txt --ignore-missing
+
+# macOS
+shasum -a 256 -c SHA256SUMS.txt --ignore-missing
+```
+
+On Windows, compare the SHA-256 of your downloaded file with the matching line in `SHA256SUMS.txt` (e.g. with `CertUtil -hashfile <file> SHA256`).
+
+Desktop builds also ship Tauri updater signatures (`latest.json` + minisign). OS installer code signing (SmartScreen / Gatekeeper) is not applied yet—expect the warnings above.
+
+## Creating a release (maintainers)
+
+Releases are produced by GitHub Actions when you push a version tag.
+
+1. Commit and push your changes to `main` (including [`.github/workflows/release.yml`](./.github/workflows/release.yml)).
+2. Create and push a tag:
+
+```bash
+git tag v0.1.0
+git push origin v0.1.0
+```
+
+3. Open the repo **Actions** tab and wait for the **release** workflow to finish on all platforms (Windows, macOS arm64/x64, Linux).
+4. Open **Releases** — a published release for that tag appears with `.exe` / `.dmg` / `.AppImage` assets, `latest.json` for auto-update, and `SHA256SUMS.txt`.
+5. After the release workflow succeeds, **pages-deploy** builds the site (including `/install`) and deploys it to Cloudflare Pages.
+
+Notes:
+
+- Tag format must be `v*` (e.g. `v0.1.0`). The leading `v` is stripped for the app version (`0.1.0`).
+- Tags with a hyphen (e.g. `v0.2.0-beta.1`) are marked as **prerelease**.
+- You can re-run a build from **Actions → release → Run workflow** and pass an existing tag.
+- Set GitHub Actions secrets `TAURI_SIGNING_PRIVATE_KEY` and `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` so release builds can sign updater artifacts.
+- Set `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` for post-release site deploys.
+
+End users should use **`/install`** on the site (latest stable by default) or **Releases → Latest**.
+
+## No release yet? Build from source
+
+```bash
+git clone https://github.com/<owner>/<repo>.git
+cd <repo>
+npm install
+npm run tauri:build
+```
+
+Installers appear under `src-tauri/target/release/bundle/`.
