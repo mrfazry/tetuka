@@ -1,0 +1,203 @@
+name: release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing tag to build (e.g. v0.1.0). Leave empty to use the pushed tag."
+        required: false
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: macos-latest
+            target: aarch64-apple-darwin
+            args: --target aarch64-apple-darwin
+          - platform: macos-latest
+            target: x86_64-apple-darwin
+            args: --target x86_64-apple-darwin
+          - platform: ubuntu-22.04
+            target: ""
+            args: ""
+          - platform: windows-latest
+            target: ""
+            args: ""
+
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - name: Resolve tag name
+        id: meta
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ -n "${{ inputs.tag }}" ]; then
+            TAG="${{ inputs.tag }}"
+          else
+            TAG="${{ github.ref_name }}"
+          fi
+          case "$TAG" in
+            v*) ;;
+            *) echo "Tag must start with v (got: $TAG)"; exit 1 ;;
+          esac
+          VERSION="${TAG#v}"
+          PRERELEASE=false
+          if [[ "$VERSION" == *-* ]]; then
+            PRERELEASE=true
+          fi
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "prerelease=$PRERELEASE" >> "$GITHUB_OUTPUT"
+          echo "Building release $TAG (version $VERSION, prerelease=$PRERELEASE)"
+
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.meta.outputs.tag }}
+
+      - name: Install Linux dependencies
+        if: matrix.platform == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            libappindicator3-dev \
+            librsvg2-dev \
+            patchelf
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Sync version from tag
+        shell: bash
+        run: |
+          VERSION="${{ steps.meta.outputs.version }}"
+          REPO="${{ github.repository }}"
+
+          node -e "
+            const fs = require('fs');
+            const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+            pkg.version = process.env.VERSION;
+            fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n');
+          "
+
+          node -e "
+            const fs = require('fs');
+            const conf = JSON.parse(fs.readFileSync('src-tauri/tauri.conf.json', 'utf8'));
+            conf.version = process.env.VERSION;
+            const endpoints = conf.plugins?.updater?.endpoints;
+            if (Array.isArray(endpoints)) {
+              conf.plugins.updater.endpoints = endpoints.map((u) =>
+                String(u).replaceAll('__REPO__', process.env.REPO)
+              );
+            }
+            fs.writeFileSync('src-tauri/tauri.conf.json', JSON.stringify(conf, null, 2) + '\n');
+          "
+
+          # Replace only the package version line in Cargo.toml
+          sed -i.bak -E "0,/^version = \".*\"/s//version = \"${VERSION}\"/" src-tauri/Cargo.toml
+          rm -f src-tauri/Cargo.toml.bak
+
+          echo "Synced version to $VERSION (repo $REPO)"
+          grep -n '^ *"version"' package.json src-tauri/tauri.conf.json | head -5
+          grep -n '^version =' src-tauri/Cargo.toml | head -1
+          grep -n 'releases/latest/download/latest.json' src-tauri/tauri.conf.json || true
+        env:
+          VERSION: ${{ steps.meta.outputs.version }}
+          REPO: ${{ github.repository }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+
+      - name: Build and upload Tauri installers
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        with:
+          tagName: ${{ steps.meta.outputs.tag }}
+          releaseName: tetuka ${{ steps.meta.outputs.tag }}
+          releaseBody: |
+            ## tetuka ${{ steps.meta.outputs.tag }}
+
+            Installers for Windows (NSIS), macOS (DMG), and Linux (AppImage).
+
+            - Local-only app — no account required
+            - Desktop builds can auto-update from GitHub Releases
+            - Verify downloads with `SHA256SUMS.txt` attached to this release
+            - See [INSTALL.md](../blob/main/INSTALL.md) for install steps per OS
+
+            ### Assets
+
+            Download the file that matches your platform from the list below.
+          releaseDraft: false
+          prerelease: ${{ steps.meta.outputs.prerelease }}
+          includeUpdaterJson: true
+          args: ${{ matrix.args }}
+
+  checksums:
+    needs: publish
+    runs-on: ubuntu-latest
+    steps:
+      - name: Resolve tag
+        id: meta
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ -n "${{ inputs.tag }}" ]; then
+            TAG="${{ inputs.tag }}"
+          else
+            TAG="${{ github.ref_name }}"
+          fi
+          case "$TAG" in
+            v*) ;;
+            *) echo "Tag must start with v (got: $TAG)"; exit 1 ;;
+          esac
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "Generating SHA256SUMS for $TAG"
+
+      - name: Download release assets and upload SHA256SUMS.txt
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.meta.outputs.tag }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/release-assets
+          cd /tmp/release-assets
+
+          # Drop a previous checksums file so we do not hash ourselves
+          gh release download "$TAG" --repo "${{ github.repository }}" --clobber || true
+          rm -f SHA256SUMS.txt
+
+          shopt -s nullglob
+          files=(*)
+          if [ ${#files[@]} -eq 0 ]; then
+            echo "No release assets found for $TAG"
+            exit 1
+          fi
+
+          sha256sum "${files[@]}" | sort -k2 > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+
+          gh release upload "$TAG" SHA256SUMS.txt \
+            --repo "${{ github.repository }}" \
+            --clobber

@@ -1,0 +1,12 @@
+# Serve static /install pages; SPA fallback for the app shell only.
+/install/*
+  /install/:splat
+  200
+
+/install
+  /install/index.html
+  200
+
+/*
+  /index.html
+  200
