@@ -78,9 +78,9 @@ Set `GITHUB_REPOSITORY=owner/repo` when building so install-page links and the v
 
 ## Usage
 
-1. **Upload** an image template, or **Generate** / **Regenerate** a procedural background (saved to the library).
+1. **Unggah gambar** (upload an image template, stored locally) or **Generate template** (procedural background, saved to the library).
 2. Paste text. Separate slides with two blank lines.
-3. Choose **1080×1350** or **1080×1080**.
-4. Preview with Prev/Next; export PNGs to a folder (desktop) or downloads (browser).
+3. Canvas is **1080×1350** (portrait). Uploaded templates must match that size exactly.
+4. Preview with Prev/Next; export slide PNGs, or export a template-only PNG from the library (desktop folder / browser download).
 
 Templates live in the app data directory on desktop, or IndexedDB in the browser.

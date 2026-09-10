@@ -1,6 +1,6 @@
 import { isTauri } from "./platform";
 import { seedDisplayName } from "./generateBackground";
-import type { AppSettings, SavedTemplate, TemplateSeed } from "./types";
+import { CANVAS_PORTRAIT, type AppSettings, type SavedTemplate, type TemplateSeed } from "./types";
 
 const INDEX_KEY = "templates/index.json";
 const SETTINGS_KEY = "settings.json";
@@ -209,12 +209,25 @@ function extFromName(name: string): string {
   return m ? m[1]!.replace("jpeg", "jpg") : "png";
 }
 
+async function assertPortraitDimensions(file: File): Promise<void> {
+  const bitmap = await createImageBitmap(file);
+  const { width, height } = bitmap;
+  bitmap.close();
+  if (width !== CANVAS_PORTRAIT.width || height !== CANVAS_PORTRAIT.height) {
+    throw new Error(
+      `Ukuran harus ${CANVAS_PORTRAIT.label} (file: ${width}×${height})`,
+    );
+  }
+}
+
 export async function saveUploadedTemplate(file: File): Promise<SavedTemplate> {
+  await assertPortraitDimensions(file);
+
   const id = uid();
   const ext = extFromName(file.name);
   const entry: SavedTemplate = {
     id,
-    name: `Tambah ${todayLabel()}`,
+    name: `Unggah ${todayLabel()}`,
     kind: "upload",
     createdAt: new Date().toISOString(),
   };

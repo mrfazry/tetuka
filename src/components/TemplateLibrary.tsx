@@ -6,20 +6,26 @@ import type { SavedTemplate } from "../lib/types";
 type Props = {
   templates: SavedTemplate[];
   activeId: string | null;
+  busy?: boolean;
   onSelect: (id: string) => void;
   onDelete: (id: string) => void;
+  onExportTemplate: (id: string) => void;
 };
 
 function Thumb({
   template,
   active,
+  busy,
   onSelect,
   onDelete,
+  onExportTemplate,
 }: {
   template: SavedTemplate;
   active: boolean;
+  busy: boolean;
   onSelect: () => void;
   onDelete: () => void;
+  onExportTemplate: () => void;
 }) {
   const [src, setSrc] = useState<string | null>(null);
 
@@ -59,6 +65,18 @@ function Thumb({
       </button>
       <button
         type="button"
+        className="lib-export secondary"
+        disabled={busy}
+        title="Ekspor latar 1080×1350 tanpa teks"
+        onClick={(e) => {
+          e.stopPropagation();
+          onExportTemplate();
+        }}
+      >
+        Ekspor template
+      </button>
+      <button
+        type="button"
         className="lib-delete"
         aria-label={`Hapus ${template.name}`}
         onClick={(e) => {
@@ -75,13 +93,15 @@ function Thumb({
 export function TemplateLibrary({
   templates,
   activeId,
+  busy = false,
   onSelect,
   onDelete,
+  onExportTemplate,
 }: Props) {
   if (templates.length === 0) {
     return (
       <div className="lib-empty">
-        Belum ada template. Tambah gambar atau buat yang baru.
+        Belum ada template. Unggah gambar atau buat yang baru.
       </div>
     );
   }
@@ -93,8 +113,10 @@ export function TemplateLibrary({
           key={t.id}
           template={t}
           active={t.id === activeId}
+          busy={busy}
           onSelect={() => onSelect(t.id)}
           onDelete={() => onDelete(t.id)}
+          onExportTemplate={() => onExportTemplate(t.id)}
         />
       ))}
     </div>

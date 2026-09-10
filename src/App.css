@@ -148,16 +148,27 @@ button.secondary {
 .lib-item {
   position: relative;
   flex: 0 0 auto;
+  width: 118px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
 }
 
 .lib-thumb {
-  width: 118px;
+  width: 100%;
   padding: 0.35rem;
   display: flex;
   flex-direction: column;
   gap: 0.35rem;
   text-align: left;
   background: var(--bg);
+}
+
+.lib-export {
+  width: 100%;
+  padding: 0.3rem 0.35rem;
+  font-size: 0.68rem;
+  line-height: 1.2;
 }
 
 .lib-item.active .lib-thumb {
@@ -296,6 +307,17 @@ button.secondary {
   background: var(--bg-soft);
   padding: 0.05rem 0.3rem;
   border-radius: 4px;
+}
+
+.field-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.field-actions button {
+  padding: 0.35rem 0.7rem;
+  font-size: 0.85rem;
 }
 
 .field textarea {
@@ -494,6 +516,12 @@ button.secondary {
   top: 0;
   pointer-events: none;
   opacity: 1;
+}
+
+.template-export-canvas {
+  position: relative;
+  overflow: hidden;
+  background: #111;
 }
 
 .settings-backdrop {

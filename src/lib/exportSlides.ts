@@ -18,29 +18,18 @@ function downloadDataUrl(dataUrl: string, filename: string): void {
   a.click();
 }
 
-/**
- * Rasterize each slide element at full resolution and write PNGs.
- * In Tauri: pick a folder and write files. In browser: download each file.
- */
-export async function exportSlides(
-  slideEls: HTMLElement[],
+async function rasterize(el: HTMLElement): Promise<string> {
+  return toPng(el, {
+    pixelRatio: 1,
+    cacheBust: true,
+    width: el.offsetWidth,
+    height: el.offsetHeight,
+  });
+}
+
+async function savePngs(
+  pngs: { name: string; dataUrl: string }[],
 ): Promise<{ count: number; folder?: string }> {
-  if (slideEls.length === 0) {
-    throw new Error("Tidak ada slide untuk diekspor");
-  }
-
-  const pngs: { name: string; dataUrl: string }[] = [];
-  for (let i = 0; i < slideEls.length; i++) {
-    const el = slideEls[i]!;
-    const dataUrl = await toPng(el, {
-      pixelRatio: 1,
-      cacheBust: true,
-      width: el.offsetWidth,
-      height: el.offsetHeight,
-    });
-    pngs.push({ name: `slide-${pad(i + 1)}.png`, dataUrl });
-  }
-
   if (await isTauri()) {
     const { open } = await import("@tauri-apps/plugin-dialog");
     const { writeFile } = await import("@tauri-apps/plugin-fs");
@@ -60,4 +49,44 @@ export async function exportSlides(
     downloadDataUrl(png.dataUrl, png.name);
   }
   return { count: pngs.length };
+}
+
+/**
+ * Rasterize each slide element at full resolution and write PNGs.
+ * In Tauri: pick a folder and write files. In browser: download each file.
+ */
+export async function exportSlides(
+  slideEls: HTMLElement[],
+): Promise<{ count: number; folder?: string }> {
+  if (slideEls.length === 0) {
+    throw new Error("Tidak ada slide untuk diekspor");
+  }
+
+  const pngs: { name: string; dataUrl: string }[] = [];
+  for (let i = 0; i < slideEls.length; i++) {
+    const el = slideEls[i]!;
+    const dataUrl = await rasterize(el);
+    pngs.push({ name: `slide-${pad(i + 1)}.png`, dataUrl });
+  }
+
+  return savePngs(pngs);
+}
+
+/** Rasterize one element and save a single PNG. */
+export async function exportSinglePng(
+  el: HTMLElement,
+  filename: string,
+): Promise<{ count: number; folder?: string }> {
+  const dataUrl = await rasterize(el);
+  return savePngs([{ name: filename, dataUrl }]);
+}
+
+export function sanitizeFilename(name: string): string {
+  const cleaned = name
+    .trim()
+    .replace(/[\\/:*?"<>|]+/g, "-")
+    .replace(/\s+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "");
+  return cleaned || "template";
 }

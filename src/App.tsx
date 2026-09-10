@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { BackgroundLayer } from "./components/BackgroundLayer";
 import { SettingsPanel } from "./components/SettingsPanel";
 import { Slide } from "./components/Slide";
 import { TemplateLibrary } from "./components/TemplateLibrary";
-import { exportSlides } from "./lib/exportSlides";
+import { exportSinglePng, exportSlides, sanitizeFilename } from "./lib/exportSlides";
 import { rollSeed } from "./lib/generateBackground";
 import { isTauri } from "./lib/platform";
 import { splitText } from "./lib/splitText";
@@ -16,11 +17,7 @@ import {
   saveSettings,
   saveUploadedTemplate,
 } from "./lib/templateLibrary";
-import {
-  CANVAS_PORTRAIT,
-  CANVAS_SQUARE,
-  type SavedTemplate,
-} from "./lib/types";
+import { CANVAS_PORTRAIT, type SavedTemplate } from "./lib/types";
 import { checkForUpdates } from "./lib/updates";
 import "./App.css";
 
@@ -36,7 +33,6 @@ Seperti slide ketiga ini.`;
 
 export default function App() {
   const [text, setText] = useState(SAMPLE);
-  const [canvasMode, setCanvasMode] = useState<"portrait" | "square">("portrait");
   const [templates, setTemplates] = useState<SavedTemplate[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [imageSrc, setImageSrc] = useState<string | null>(null);
@@ -50,11 +46,21 @@ export default function App() {
   const [checkingUpdate, setCheckingUpdate] = useState(false);
 
   const exportRefs = useRef<(HTMLDivElement | null)[]>([]);
+  const templateExportRef = useRef<HTMLDivElement | null>(null);
+  const templateExportWaiter = useRef<{
+    resolve: (el: HTMLDivElement) => void;
+    reject: (err: Error) => void;
+  } | null>(null);
   const autoUpdateChecked = useRef(false);
   const previewFrameRef = useRef<HTMLDivElement | null>(null);
+  const textAreaRef = useRef<HTMLTextAreaElement | null>(null);
   const [frameWidth, setFrameWidth] = useState(0);
+  const [templateExport, setTemplateExport] = useState<{
+    template: SavedTemplate;
+    imageSrc: string | null;
+  } | null>(null);
 
-  const size = canvasMode === "portrait" ? CANVAS_PORTRAIT : CANVAS_SQUARE;
+  const size = CANVAS_PORTRAIT;
   const slides = useMemo(() => splitText(text), [text]);
   const active = templates.find((t) => t.id === activeId) ?? null;
 
@@ -69,8 +75,11 @@ export default function App() {
       const desktop = await isTauri();
       setIsDesktop(desktop);
       const settings = await loadSettings();
-      setCanvasMode(settings.canvas);
+      // Portrait-only for now; coerce any stored "square" setting.
       setAutoUpdate(settings.autoUpdate);
+      if (settings.canvas !== "portrait") {
+        await saveSettings({ ...settings, canvas: "portrait" });
+      }
       const list = await refresh();
       const initial =
         (settings.lastTemplateId &&
@@ -95,10 +104,10 @@ export default function App() {
     if (!ready) return;
     void saveSettings({
       lastTemplateId: activeId,
-      canvas: canvasMode,
+      canvas: "portrait",
       autoUpdate,
     });
-  }, [activeId, canvasMode, autoUpdate, ready]);
+  }, [activeId, autoUpdate, ready]);
 
   const handleCheckUpdates = async () => {
     setCheckingUpdate(true);
@@ -178,7 +187,12 @@ export default function App() {
       setStatus(`Disimpan “${entry.name}”`);
     } catch (err) {
       console.error(err);
-      setStatus("Tidak bisa menambah template");
+      const msg = err instanceof Error ? err.message : "";
+      setStatus(
+        msg.startsWith("Ukuran harus")
+          ? msg
+          : "Tidak bisa menambah template",
+      );
     } finally {
       setBusy(false);
     }
@@ -199,6 +213,36 @@ export default function App() {
     } finally {
       setBusy(false);
     }
+  };
+
+  const handleClearText = () => {
+    setText("");
+    setStatus(null);
+    textAreaRef.current?.focus();
+  };
+
+  const handlePasteText = async () => {
+    try {
+      const pasted = await navigator.clipboard.readText();
+      setText(pasted);
+      setStatus(pasted.trim() ? "Teks ditempel" : "Clipboard kosong");
+      textAreaRef.current?.focus();
+    } catch (err) {
+      console.error(err);
+      setStatus("Di HP: tekan lama di kotak teks lalu pilih Tempel");
+      textAreaRef.current?.focus();
+    }
+  };
+
+  const handleTextAreaFocus = () => {
+    const el = textAreaRef.current;
+    if (!el || el.value !== SAMPLE) return;
+    // Defer so focus settles; selecting SAMPLE lets native paste replace it.
+    requestAnimationFrame(() => {
+      if (textAreaRef.current?.value === SAMPLE) {
+        textAreaRef.current.select();
+      }
+    });
   };
 
   const handleExport = async () => {
@@ -227,7 +271,54 @@ export default function App() {
     }
   };
 
-  const desktopCap = canvasMode === "portrait" ? 0.32 : 0.36;
+  const handleExportTemplate = async (id: string) => {
+    const template = templates.find((t) => t.id === id);
+    if (!template) {
+      setStatus("Template tidak ditemukan");
+      return;
+    }
+    setBusy(true);
+    setStatus("Mengekspor template…");
+    try {
+      const src =
+        template.kind === "upload" ? await resolveImageSrc(template) : null;
+      const el = await new Promise<HTMLDivElement>((resolve, reject) => {
+        templateExportWaiter.current = { resolve, reject };
+        setTemplateExport({ template, imageSrc: src });
+      });
+      const filename = `${sanitizeFilename(template.name)}.png`;
+      const result = await exportSinglePng(el, filename);
+      setStatus(
+        result.folder
+          ? `Template diekspor ke ${result.folder}`
+          : "Template diunduh",
+      );
+    } catch (err) {
+      console.error(err);
+      const msg = err instanceof Error ? err.message : "Ekspor gagal";
+      setStatus(msg === "Ekspor dibatalkan" ? "Ekspor dibatalkan" : "Ekspor gagal");
+    } finally {
+      templateExportWaiter.current = null;
+      setTemplateExport(null);
+      setBusy(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!templateExport) return;
+    const waiter = templateExportWaiter.current;
+    if (!waiter) return;
+    const el = templateExportRef.current;
+    templateExportWaiter.current = null;
+    if (!el) {
+      waiter.reject(new Error("Ekspor gagal"));
+      return;
+    }
+    // Let layout settle before rasterizing
+    requestAnimationFrame(() => waiter.resolve(el));
+  }, [templateExport]);
+
+  const desktopCap = 0.32;
   const previewScale =
     frameWidth > 0
       ? Math.min(desktopCap, frameWidth / size.width)
@@ -256,20 +347,16 @@ export default function App() {
           </p>
         </div>
         <div className="header-actions">
-          <button type="button" onClick={handleUpload} disabled={busy}>
-            Tambah
+          <button
+            type="button"
+            onClick={handleUpload}
+            disabled={busy}
+            title="Disimpan di perangkat Anda, tidak dikirim ke server"
+          >
+            Unggah gambar
           </button>
           <button type="button" onClick={handleGenerate} disabled={busy}>
             Generate template
-          </button>
-          <button
-            type="button"
-            className="secondary"
-            onClick={handleGenerate}
-            disabled={busy}
-            title="Buat latar prosedural baru"
-          >
-            Regenerate template
           </button>
           <button
             type="button"
@@ -305,44 +392,47 @@ export default function App() {
         <TemplateLibrary
           templates={templates}
           activeId={activeId}
+          busy={busy}
           onSelect={selectTemplate}
           onDelete={handleDelete}
+          onExportTemplate={(id) => void handleExportTemplate(id)}
         />
       </section>
 
       <div className="workspace">
         <aside className="controls">
-          <label className="field">
-            <span>Ukuran kanvas</span>
-            <div className="segmented">
-              <button
-                type="button"
-                className={canvasMode === "portrait" ? "on" : ""}
-                onClick={() => setCanvasMode("portrait")}
-              >
-                1080 × 1350
-              </button>
-              <button
-                type="button"
-                className={canvasMode === "square" ? "on" : ""}
-                onClick={() => setCanvasMode("square")}
-              >
-                1080 × 1080
-              </button>
-            </div>
-          </label>
-
           <label className="field grow">
             <span>
               Teks{" "}
               <em>
-                (dua baris kosong memisahkan slide)
+                (dua baris kosong memisahkan slide · di HP: tekan lama lalu
+                Tempel)
               </em>
             </span>
+            <div className="field-actions">
+              <button
+                type="button"
+                className="secondary"
+                onClick={handleClearText}
+                disabled={!text}
+              >
+                Hapus
+              </button>
+              <button
+                type="button"
+                className="secondary"
+                onClick={() => void handlePasteText()}
+              >
+                Tempel
+              </button>
+            </div>
             <textarea
+              ref={textAreaRef}
               value={text}
               onChange={(e) => setText(e.target.value)}
+              onFocus={handleTextAreaFocus}
               spellCheck={false}
+              placeholder="Tempel teks di sini…"
             />
           </label>
 
@@ -451,6 +541,21 @@ export default function App() {
             }}
           />
         ))}
+        {templateExport && (
+          <div
+            ref={templateExportRef}
+            className="template-export-canvas"
+            style={{
+              width: CANVAS_PORTRAIT.width,
+              height: CANVAS_PORTRAIT.height,
+            }}
+          >
+            <BackgroundLayer
+              template={templateExport.template}
+              imageSrc={templateExport.imageSrc}
+            />
+          </div>
+        )}
       </div>
     </div>
   );
